@@ -1,0 +1,10 @@
+.env
+
+postgres_data/
+n8n_data/
+redis_data/
+evolution_instances/
+waha_sessions/
+
+.DS_Store
+Thumbs.db

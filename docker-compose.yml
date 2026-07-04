@@ -1,50 +1,66 @@
 services:
   postgres:
     image: postgres:15
-    restart: always
     environment:
       POSTGRES_USER: n8n_user
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: n8n_db
     volumes:
       - ./postgres_data:/var/lib/postgresql/data
-    # Adicionado healthcheck para garantir que o banco inicie antes do n8n
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h localhost -U n8n_user -d n8n_db"]
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - automacoes_net
 
   n8n:
     image: docker.n8n.io/n8nio/n8n
-    restart: always
     ports:
-      - "5678:5678"
+      - "5679:5678"
     environment:
-      # Banco de Dados
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
       - DB_POSTGRESDB_PORT=5432
       - DB_POSTGRESDB_DATABASE=n8n_db
       - DB_POSTGRESDB_USER=n8n_user
       - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
-      
-      # Ambiente e Host
       - NODE_ENV=production
       - N8N_HOST=${DOMAIN_NAME:-localhost}
       - N8N_PORT=5678
       - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
-      
-      # Configurações Essenciais para WhatsApp
       - WEBHOOK_URL=${WEBHOOK_URL}
       - GENERIC_TIMEZONE=America/Sao_Paulo
       - TZ=America/Sao_Paulo
-      
-      # (Opcional) Limpeza de execuções antigas para não lotar o banco com logs de chat
       - EXECUTIONS_DATA_PRUNE=true
-      - EXECUTIONS_DATA_MAX_AGE=168 # Mantém logs por 7 dias (168 horas)
+      - EXECUTIONS_DATA_MAX_AGE=168
     volumes:
       - ./n8n_data:/home/node/.n8n
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - automacoes_net
+
+  waha:
+    image: devlikeapro/waha:latest
+    container_name: waha
+    restart: always
+    shm_size: '2gb'
+    ports:
+      - "3000:3000"
+    environment:
+      - WAHA_API_KEY=${WAHA_API_KEY}
+      - WAHA_DASHBOARD_USERNAME=${WAHA_DASHBOARD_USERNAME:-admin}
+      - WAHA_DASHBOARD_PASSWORD=${WAHA_DASHBOARD_PASSWORD}
+      - WHATSAPP_HOOK_URL=${WHATSAPP_HOOK_URL}
+      - WHATSAPP_HOOK_EVENTS=*
+    volumes:
+      - ./waha_sessions:/app/.sessions
+    networks:
+      - automacoes_net
+
+networks:
+  automacoes_net:
+    driver: bridge
